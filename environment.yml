@@ -6,7 +6,6 @@ channels:
 dependencies:
   - python=3.9
   - numpy
-  - pythonocc-core=7.5.1
   - networkx
   - wxPython
   - pydeprecate

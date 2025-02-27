@@ -2,20 +2,7 @@
 
 OCCWL is a simple, lightweight Pythonic wrapper around pythonocc (python bindings for OpenCascade).
 
-## Installing our conda package
-
-```
-conda create --name=myoccwlenv python=3.7
-source activate myoccwlenv
-conda install -c lambouj -c conda-forge occwl
-```
-
-We have noticed `conda` running very slow recently.  See issue #26.  If `conda` is too slow, we recommend using `mamba`.
-```
-conda install -n base mamba -c conda-forge
-...
-mamba install occwl -c lambouj -c conda-forge
-```
+This is modified library, install python-occ manually.
 
 
 ## Hello world
