@@ -2,7 +2,7 @@ import numpy as np
 
 from OCC.Core.gp import gp_Pnt, gp_Dir, gp_Pnt2d, gp_Ax2
 from OCC.Core.Bnd import Bnd_Box
-from OCC.Core.BRepBndLib import brepbndlib_Add, brepbndlib_AddOptimal
+from OCC.Core.BRepBndLib import brepbndlib
 from OCC.Extend import TopologyUtils
 from OCC.Core.BRepGProp import (
     brepgprop_LinearProperties,
@@ -571,7 +571,7 @@ class BoundingBoxMixin:
         """
         from occwl.geometry import geom_utils
         b = Bnd_Box()
-        brepbndlib_Add(self.topods_shape(), b)
+        brepbndlib.Add(self.topods_shape(), b)
         return geom_utils.box_to_geometry(b)
 
     def exact_box(self, use_shapetolerance=False):
@@ -588,7 +588,7 @@ class BoundingBoxMixin:
         from occwl.geometry import geom_utils
         b = Bnd_Box()
         use_triangulation = True
-        brepbndlib_AddOptimal(self.topods_shape(), b, use_triangulation, use_shapetolerance)
+        brepbndlib.AddOptimal(self.topods_shape(), b, use_triangulation, use_shapetolerance)
         return geom_utils.box_to_geometry(b)
 
     def scale_to_box(self, box_side, copy=True):
