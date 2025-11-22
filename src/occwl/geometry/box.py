@@ -79,3 +79,19 @@ class Box:
     def offset(self, dist):
         for i in range(len(self.intervals)):
             self.intervals[i].offset(dist)
+
+    def get_bounding_box(self):
+        if len(self.intervals) < 3:
+            raise ValueError("Box must be 3D to get bounding box data")
+
+        min_pt = self.min_point()
+        max_pt = self.max_point()
+
+        xmin, ymin, zmin = min_pt[0], min_pt[1], min_pt[2]
+        xmax, ymax, zmax = max_pt[0], max_pt[1], max_pt[2]
+
+        return [
+            "%.2f" % xmin, "%.2f" % ymin, "%.2f" % zmin,
+            "%.2f" % xmax, "%.2f" % ymax, "%.2f" % zmax,
+            "%.2f" % (xmax - xmin), "%.2f" % (ymax - ymin), "%.2f" % (zmax - zmin)
+        ]

@@ -504,3 +504,164 @@ class Edge(Shape, VertexContainerMixin, BoundingBoxMixin):
             p = curve_adaptor.Value(discretizer.Parameter(i))
             points.append(np.array(list(p.Coord())))
         return np.asarray(points, dtype=np.float32)
+    
+
+    def get_data(self, idx=None):
+        """
+        Get the data of given surface.
+
+        Returns:
+            dict.
+        """
+        brep_adaptor_curve = BRepAdaptor_Curve(self.topods_shape())
+        curv_type = brep_adaptor_curve.GetType()
+
+        if curv_type == GeomAbs_Line:
+            line_curve = brep_adaptor_curve.Line()
+            return {
+                'type': 'Curve',
+                'kind': 'Line',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(line_curve.Location().Coord()),
+                'direction': list(line_curve.Direction().Coord()),
+            }
+
+        if curv_type == GeomAbs_Circle:
+            circle_curve = brep_adaptor_curve.Circle()
+            return {
+                'type': 'Curve',
+                'kind': 'Circle',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(circle_curve.Location().Coord()),
+                'radius': circle_curve.Radius(),
+                'x_axis': list(circle_curve.XAxis().Direction().Coord()),
+                'y_axis': list(circle_curve.YAxis().Direction().Coord()),
+            }
+
+        if curv_type == GeomAbs_Ellipse:
+            ellipse_curve = brep_adaptor_curve.Ellipse()
+            return {
+                'type': 'Curve',
+                'kind': 'Ellipse',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(ellipse_curve.Location().Coord()),
+                'focus1': list(ellipse_curve.Focus1().Coord()),
+                'focus2': list(ellipse_curve.Focus2().Coord()),
+                'x_axis': list(ellipse_curve.XAxis().Direction().Coord()),
+                'y_axis': list(ellipse_curve.YAxis().Direction().Coord()),
+                'major_radius': ellipse_curve.MajorRadius(),
+                'minor_radius': ellipse_curve.MinorRadius(),
+            }
+
+        if curv_type == GeomAbs_Hyperbola:
+            hyperbola_curve = brep_adaptor_curve.Hyperbola()
+            return {
+                'type': 'Curve',
+                'kind': 'Hyperbola',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(hyperbola_curve.Location().Coord()),
+                'focus1': list(hyperbola_curve.Focus1().Coord()),
+                'focus2': list(hyperbola_curve.Focus2().Coord()),
+                'x_axis': list(hyperbola_curve.XAxis().Direction().Coord()),
+                'y_axis': list(hyperbola_curve.YAxis().Direction().Coord()),
+                'major_radius': hyperbola_curve.MajorRadius(),
+                'minor_radius': hyperbola_curve.MinorRadius(),
+            }
+
+        if curv_type == GeomAbs_Parabola:
+            parabola_curve = brep_adaptor_curve.Parabola()
+            return {
+                'type': 'Curve',
+                'kind': 'Parabola',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(parabola_curve.Location().Coord()),
+                'focus': list(parabola_curve.Focus().Coord()),
+                'x_axis': list(parabola_curve.XAxis().Direction().Coord()),
+                'y_axis': list(parabola_curve.YAxis().Direction().Coord()),
+                'focal_length': parabola_curve.Focal(),
+            }
+
+        if curv_type == GeomAbs_BezierCurve:
+            bezier_curve = brep_adaptor_curve.Bezier()
+            degree = bezier_curve.Degree()
+            rational = bezier_curve.IsRational()
+
+            # Extract control points
+            from OCC.Core.TColgp import TColgp_Array1OfPnt
+            from OCC.Core.TColStd import TColStd_Array1OfReal
+
+            p = TColgp_Array1OfPnt(1, bezier_curve.NbPoles())
+            bezier_curve.Poles(p)
+            ctrl_points = [list(p.Value(pi + 1).Coord()) for pi in range(p.Length())]
+
+            # Extract weights
+            w = TColStd_Array1OfReal(1, bezier_curve.NbPoles())
+            bezier_curve.Weights(w)
+            weights = [w.Value(wi + 1) for wi in range(w.Length())]
+
+            return {
+                'type': 'Curve',
+                'kind': 'BezierCurve',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'rational': rational,
+                'degree': degree,
+                'control_points': ctrl_points,
+                'weights': weights,
+            }
+
+        if curv_type == GeomAbs_BSplineCurve:
+            bspline_curve = brep_adaptor_curve.BSpline()
+
+            if bspline_curve.IsPeriodic():
+                bspline_curve.SetNotPeriodic()
+
+            degree = bspline_curve.Degree()
+            rational = bspline_curve.IsRational()
+
+            # Extract control points
+            from OCC.Core.TColgp import TColgp_Array1OfPnt
+            from OCC.Core.TColStd import TColStd_Array1OfReal
+
+            p = TColgp_Array1OfPnt(1, bspline_curve.NbPoles())
+            bspline_curve.Poles(p)
+            ctrl_points = [list(p.Value(pi + 1).Coord()) for pi in range(p.Length())]
+
+            # Extract knot vector (with multiplicities)
+            k = TColStd_Array1OfReal(1, bspline_curve.NbPoles() + bspline_curve.Degree() + 1)
+            bspline_curve.KnotSequence(k)
+            knotvector = [k.Value(ki + 1) for ki in range(k.Length())]
+
+            # Extract weights
+            w = TColStd_Array1OfReal(1, bspline_curve.NbPoles())
+            bspline_curve.Weights(w)
+            weights = [w.Value(wi + 1) for wi in range(w.Length())]
+
+            return {
+                'type': 'Curve',
+                'kind': 'BSplineCurve',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'rational': rational,
+                'degree': degree,
+                'knotvector': knotvector,
+                'control_points': ctrl_points,
+                'weights': weights,
+            }
+
+        if curv_type == GeomAbs_OffsetCurve:
+            # Offset curves reference a base curve with an offset distance
+            return {
+                'type': 'Curve',
+                'kind': 'OffsetCurve',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+            }
+
+        return None
+

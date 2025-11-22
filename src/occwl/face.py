@@ -584,3 +584,201 @@ class Face(Shape, BoundingBoxMixin, TriangulatorMixin, WireContainerMixin, \
             return np_verts, np_tris, np_normals
         else:
             return np_verts, np_tris
+
+
+    def get_data(self, idx=None):
+        """
+        Get the data of given surface.
+
+        Returns:
+            dict.
+        """
+        if not self.topods_shape().Location().IsIdentity():
+            tsf = self.topods_shape().Location().Transformation()
+            np_tsf = geom_utils.to_numpy(tsf)
+            assert np.allclose(np_tsf, np.eye(4)), \
+                "Requesting surface for transformed face. /n\
+                Call solid.set_transform_to_identity() to remove the transform /n\
+                or compound.transform(np.eye(4)) to bake in the assembly transform"
+        srf = BRepAdaptor_Surface(self.topods_shape())
+        surf_type = self.surface_type()
+        if surf_type == "plane":
+            plane_surface = srf.Plane()
+            return {
+                'type': 'Surface',
+                'kind': 'Plane',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(plane_surface.Location().Coord()),
+                'x_axis': list(plane_surface.XAxis().Direction().Coord()),
+                'y_axis': list(plane_surface.YAxis().Direction().Coord()),
+                'z_axis': list(plane_surface.Axis().Direction().Coord()),
+                'coefficients': list(plane_surface.Coefficients()),
+            }
+
+        if surf_type == "cylinder":
+            cylinder_surface = srf.Cylinder()
+            return {
+                'type': 'Surface',
+                'kind': 'Cylinder',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(cylinder_surface.Location().Coord()),
+                'z_axis': list(cylinder_surface.Axis().Direction().Coord()),
+                'x_axis': list(cylinder_surface.XAxis().Direction().Coord()),
+                'y_axis': list(cylinder_surface.YAxis().Direction().Coord()),
+                'coefficients': list(cylinder_surface.Coefficients()),
+                'radius': cylinder_surface.Radius(),
+            }
+
+        if surf_type == "cone":
+            conical_surface = srf.Cone()
+            return {
+                'type': 'Surface',
+                'kind': 'Cone',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(conical_surface.Location().Coord()),
+                'z_axis': list(conical_surface.Axis().Direction().Coord()),
+                'x_axis': list(conical_surface.XAxis().Direction().Coord()),
+                'y_axis': list(conical_surface.YAxis().Direction().Coord()),
+                'coefficients': list(conical_surface.Coefficients()),
+                'radius': conical_surface.RefRadius(),
+                'angle': conical_surface.SemiAngle(),
+                'apex': list(conical_surface.Apex().Coord()),
+            }
+
+        if surf_type == "sphere":
+            sphere_surface = srf.Sphere()
+            return {
+                'type': 'Surface',
+                'kind': 'Sphere',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(sphere_surface.Location().Coord()),
+                'x_axis': list(sphere_surface.XAxis().Direction().Coord()),
+                'y_axis': list(sphere_surface.YAxis().Direction().Coord()),
+                'coefficients': list(sphere_surface.Coefficients()),
+                'radius': sphere_surface.Radius(),
+            }
+
+        if surf_type == "torus":
+            torus_surface = srf.Torus()
+            return {
+                'type': 'Surface',
+                'kind': 'Torus',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'location': list(torus_surface.Location().Coord()),
+                'z_axis': list(torus_surface.Axis().Direction().Coord()),
+                'x_axis': list(torus_surface.XAxis().Direction().Coord()),
+                'y_axis': list(torus_surface.YAxis().Direction().Coord()),
+                'max_radius': torus_surface.MajorRadius(),
+                'min_radius': torus_surface.MinorRadius(),
+            }
+
+        if surf_type == "bezier":
+            bezier_surface = srf.Bezier()
+            u_degree = bezier_surface.UDegree()
+            v_degree = bezier_surface.VDegree()
+            nb_u_poles = bezier_surface.NbUPoles()
+            nb_v_poles = bezier_surface.NbVPoles()
+
+            # Extract control points
+            poles = []
+            for i in range(1, nb_u_poles + 1):
+                u_poles = []
+                for j in range(1, nb_v_poles + 1):
+                    pole = bezier_surface.Pole(i, j)
+                    u_poles.append(list(pole.Coord()))
+                poles.append(u_poles)
+
+            # Extract weights
+            weights = []
+            for i in range(1, nb_u_poles + 1):
+                u_weights = []
+                for j in range(1, nb_v_poles + 1):
+                    u_weights.append(bezier_surface.Weight(i, j))
+                weights.append(u_weights)
+
+            return {
+                'type': 'Surface',
+                'kind': 'BezierSurface',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'u_degree': u_degree,
+                'v_degree': v_degree,
+                'nb_u_poles': nb_u_poles,
+                'nb_v_poles': nb_v_poles,
+                'poles': poles,
+                'weights': weights,
+            }
+
+        if surf_type == "bspline":
+            bspline_surface = srf.BSpline()
+
+            if bspline_surface.IsUPeriodic():
+                bspline_surface.SetUNotPeriodic()
+
+            if bspline_surface.IsVPeriodic():
+                bspline_surface.SetVNotPeriodic()
+
+            # Extract surface properties
+            u_rational = bspline_surface.IsURational()
+            v_rational = bspline_surface.IsVRational()
+            degree_u = bspline_surface.UDegree()
+            degree_v = bspline_surface.VDegree()
+            size_u = bspline_surface.NbUPoles()
+            size_v = bspline_surface.NbVPoles()
+
+            # Extract control points using Array2OfPnt
+            from OCC.Core.TColgp import TColgp_Array2OfPnt
+            from OCC.Core.TColStd import TColStd_Array1OfReal, TColStd_Array2OfReal
+
+            p = TColgp_Array2OfPnt(1, size_u, 1, size_v)
+            bspline_surface.Poles(p)
+
+            ctrl_points = []
+            for pi in range(p.ColLength()):
+                elems = []
+                for pj in range(p.RowLength()):
+                    elems.append(list(p.Value(pi + 1, pj + 1).Coord()))
+                ctrl_points.append(elems)
+
+            # Extract U knot sequence (includes multiplicities)
+            k_u = TColStd_Array1OfReal(1, size_u + degree_u + 1)
+            bspline_surface.UKnotSequence(k_u)
+            knotvector_u = [k_u.Value(ki + 1) for ki in range(k_u.Length())]
+
+            # Extract V knot sequence (includes multiplicities)
+            k_v = TColStd_Array1OfReal(1, size_v + degree_v + 1)
+            bspline_surface.VKnotSequence(k_v)
+            knotvector_v = [k_v.Value(ki + 1) for ki in range(k_v.Length())]
+
+            # Extract weights using Array2OfReal
+            w = TColStd_Array2OfReal(1, size_u, 1, size_v)
+            bspline_surface.Weights(w)
+            weights = []
+            for wi in range(w.ColLength()):
+                elems = []
+                for wj in range(w.RowLength()):
+                    elems.append(w.Value(wi + 1, wj + 1))
+                weights.append(elems)
+
+            return {
+                'type': 'Surface',
+                'kind': 'BSplineSurface',
+                'idx': idx,
+                'bounding_box': self.box().get_bounding_box(),
+                'rational': u_rational and v_rational,
+                'degree_u': degree_u,
+                'degree_v': degree_v,
+                'size_u': size_u,
+                'size_v': size_v,
+                'knotvector_u': knotvector_u,
+                'knotvector_v': knotvector_v,
+                'control_points': ctrl_points,
+                'weights': weights,
+            }
+
+        raise ValueError("Unknown surface type: ", surf_type)
